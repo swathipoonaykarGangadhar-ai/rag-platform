@@ -1,0 +1,150 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f0f2f5;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 280px;
+  background: #1a1a2e;
+  color: white;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #7c6af7;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-top: -16px;
+}
+
+.section-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.file-input {
+  width: 100%;
+  font-size: 13px;
+  color: #ccc;
+  margin-bottom: 12px;
+}
+
+.upload-btn {
+  width: 100%;
+  padding: 10px;
+  background: #7c6af7;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upload-btn:hover { background: #6a58e0; }
+
+.upload-status {
+  font-size: 12px;
+  color: #a0f0a0;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #aaa;
+  margin-top: 40%;
+  font-size: 16px;
+}
+
+.message { display: flex; }
+.message.user { justify-content: flex-end; }
+.message.bot { justify-content: flex-start; }
+
+.bubble {
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.message.user .bubble {
+  background: #7c6af7;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message.bot .bubble {
+  background: white;
+  color: #333;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.loading { color: #aaa; font-style: italic; }
+
+.input-area {
+  padding: 16px 24px;
+  background: white;
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid #eee;
+}
+
+.question-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 24px;
+  font-size: 14px;
+  outline: none;
+}
+
+.question-input:focus { border-color: #7c6af7; }
+
+.ask-btn {
+  padding: 12px 24px;
+  background: #7c6af7;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ask-btn:hover { background: #6a58e0; }
