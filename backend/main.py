@@ -6,6 +6,7 @@ from backend.ingestor import save_uploaded_file, extract_text, chunk_text
 from backend.embedder import embed_and_store
 from backend.retriever import search_with_sources
 from backend.generator import generate_answer
+from backend.history import save_message, get_history, clear_history
 
 load_dotenv()
 
@@ -31,7 +32,7 @@ def list_documents():
     data_dir = "data"
     if not os.path.exists(data_dir):
         return {"documents": []}
-    allowed = (".pdf", ".docx", ".txt", ".csv", ".json", 
+    allowed = (".pdf", ".docx", ".txt", ".csv", ".json",
                ".md", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a")
     files = [f for f in os.listdir(data_dir) if f.endswith(allowed)]
     return {"documents": files}
@@ -60,8 +61,17 @@ async def ask_question(query: dict):
     question = query.get("question", "")
     chunks_with_sources = search_with_sources(question)
     result = generate_answer(question, chunks_with_sources)
+    save_message(question, result["answer"], result["sources"])
     return {
         "question": question,
         "answer": result["answer"],
         "sources": result["sources"]
     }
+
+@app.get("/history")
+def get_chat_history():
+    return {"history": get_history()}
+
+@app.delete("/history")
+def clear_chat_history():
+    return clear_history()
