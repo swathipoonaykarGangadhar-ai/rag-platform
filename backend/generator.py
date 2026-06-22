@@ -39,3 +39,26 @@ Answer:"""
         "answer": answer,
         "sources": sources
     }
+def summarize_document(chunks: list) -> str:
+    # Take first 10 chunks for summary to avoid token limits
+    sample_chunks = chunks[:10]
+    context = "\n\n".join(sample_chunks)
+    
+    prompt = f"""You are a document analyst. Read the following document content and provide a concise summary in 3-5 sentences covering:
+- What this document is about
+- Key topics or information it contains
+- Who it might be intended for
+
+Document content:
+{context}
+
+Summary:"""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=300
+    )
+    
+    return response.choices[0].message.content

@@ -35,6 +35,8 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [theme, setTheme] = useState('dark');
   const [toast, setToast] = useState(null);
+  const [summaries, setSummaries] = useState({});
+  const [expandedDoc, setExpandedDoc] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -108,6 +110,16 @@ function App() {
       showToast(`Deleted ${filename}`);
     } catch {
       showToast('Failed to delete', 'error');
+    }
+  };
+
+  const summarizeDocument = async (filename) => {
+    setSummaries(prev => ({ ...prev, [filename]: 'loading' }));
+    try {
+      const res = await axios.post(`${API}/summarize/${encodeURIComponent(filename)}`);
+      setSummaries(prev => ({ ...prev, [filename]: res.data.summary }));
+    } catch {
+      setSummaries(prev => ({ ...prev, [filename]: 'Failed to summarize.' }));
     }
   };
 
@@ -188,13 +200,30 @@ function App() {
                 <div className="no-docs">No documents yet — upload one above</div>
               )}
               {documents.map((doc, i) => (
-                <div key={i} className="doc-item">
-                  <span className="doc-type-icon">{getFileIcon(doc)}</span>
-                  <div className="doc-info">
-                    <div className="doc-name">{doc}</div>
-                    <div className="doc-type">{getFileExt(doc)}</div>
+                <div key={i}>
+                  <div className="doc-item">
+                    <span className="doc-type-icon">{getFileIcon(doc)}</span>
+                    <div className="doc-info">
+                      <div className="doc-name">{doc}</div>
+                      <div className="doc-type">{getFileExt(doc)}</div>
+                    </div>
+                    <button
+                      className="doc-summarize"
+                      onClick={() => {
+                        setExpandedDoc(expandedDoc === doc ? null : doc);
+                        if (!summaries[doc]) summarizeDocument(doc);
+                      }}
+                      title="Summarize"
+                    >✦</button>
+                    <button className="doc-delete" onClick={() => deleteDocument(doc)}>✕</button>
                   </div>
-                  <button className="doc-delete" onClick={() => deleteDocument(doc)}>✕</button>
+                  {expandedDoc === doc && (
+                    <div className="doc-summary">
+                      {summaries[doc] === 'loading'
+                        ? <span className="summary-loading">Summarizing...</span>
+                        : summaries[doc] || 'Click ✦ to summarize'}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

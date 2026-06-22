@@ -601,3 +601,33 @@ body {
   .bubble { max-width: 90%; }
   .topbar-sub { display: none; }
 }
+.doc-summarize {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.doc-item:hover .doc-summarize { opacity: 1; }
+.doc-summarize:hover { background: var(--accent-light); }
+
+.doc-summary {
+  background: var(--accent-light);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.summary-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}

@@ -7,7 +7,7 @@ from backend.embedder import embed_and_store
 from backend.retriever import search_with_sources
 from backend.generator import generate_answer
 from backend.history import save_message, get_history, clear_history
-
+from backend.generator import generate_answer, summarize_document
 load_dotenv()
 
 app = FastAPI(title="RAG Document Intelligence Platform")
@@ -55,7 +55,17 @@ async def upload_document(file: UploadFile = File(...)):
         "message": f"Successfully processed {file.filename}",
         "chunks_stored": count
     }
-
+@app.post("/summarize/{filename}")
+async def summarize_doc(filename: str):
+    filepath = os.path.join("data", filename)
+    if not os.path.exists(filepath):
+        return {"error": "File not found"}
+    text = extract_text(filepath)
+    chunks = chunk_text(text)
+    if not chunks:
+        return {"summary": "Could not extract text from this document."}
+    summary = summarize_document(chunks)
+    return {"filename": filename, "summary": summary}
 @app.post("/ask")
 async def ask_question(query: dict):
     question = query.get("question", "")
