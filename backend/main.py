@@ -26,6 +26,22 @@ def home():
 def health():
     return {"status": "healthy"}
 
+@app.get("/documents")
+def list_documents():
+    data_dir = "data"
+    if not os.path.exists(data_dir):
+        return {"documents": []}
+    files = [f for f in os.listdir(data_dir) 
+             if f.endswith((".pdf", ".docx"))]
+    return {"documents": files}
+
+@app.delete("/documents/{filename}")
+def delete_document(filename: str):
+    filepath = os.path.join("data", filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    return {"message": f"Deleted {filename}"}
+
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
     contents = await file.read()

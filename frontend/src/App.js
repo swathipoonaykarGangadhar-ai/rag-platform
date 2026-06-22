@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -10,6 +10,20 @@ function App() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [documents, setDocuments] = useState([]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const res = await axios.get(`${API}/documents`);
+      setDocuments(res.data.documents);
+    } catch (err) {
+      console.error('Failed to fetch documents');
+    }
+  };
 
   const uploadFile = async () => {
     if (!file) return;
@@ -18,9 +32,19 @@ function App() {
     setUploadStatus('Uploading...');
     try {
       const res = await axios.post(`${API}/upload`, formData);
-      setUploadStatus(`Done! ${res.data.chunks_stored} chunks stored from ${file.name}`);
+      setUploadStatus(`Done! ${res.data.chunks_stored} chunks stored`);
+      fetchDocuments();
     } catch (err) {
       setUploadStatus('Upload failed. Try again.');
+    }
+  };
+
+  const deleteDocument = async (filename) => {
+    try {
+      await axios.delete(`${API}/documents/${filename}`);
+      fetchDocuments();
+    } catch (err) {
+      console.error('Failed to delete document');
     }
   };
 
@@ -32,7 +56,11 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.post(`${API}/ask`, { question });
-      const botMsg = { role: 'bot', text: res.data.answer, sources: res.data.sources };
+      const botMsg = { 
+        role: 'bot', 
+        text: res.data.answer, 
+        sources: res.data.sources 
+      };
       setMessages(prev => [...prev, botMsg]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'bot', text: 'Error getting answer. Try again.' }]);
@@ -49,6 +77,7 @@ function App() {
       <div className="sidebar">
         <h1>RAG Platform</h1>
         <p className="subtitle">Document Intelligence</p>
+
         <div className="upload-section">
           <p className="section-label">Upload Document</p>
           <input
@@ -62,33 +91,51 @@ function App() {
           </button>
           {uploadStatus && <p className="upload-status">{uploadStatus}</p>}
         </div>
+
+        <div className="docs-section">
+          <p className="section-label">Documents ({documents.length})</p>
+          {documents.length === 0 && (
+            <p className="no-docs">No documents yet</p>
+          )}
+          {documents.map((doc, i) => (
+            <div key={i} className="doc-item">
+              <span className="doc-icon">📄</span>
+              <span className="doc-name">{doc}</span>
+              <button 
+                className="delete-btn"
+                onClick={() => deleteDocument(doc)}
+              >×</button>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="chat-area">
         <div className="messages">
           {messages.length === 0 && (
             <div className="empty-state">
-              <p>Upload a document and ask anything about it!</p>
+              <p>Upload documents and ask anything about them!</p>
+              <p className="empty-sub">AI will search across all your documents</p>
             </div>
           )}
           {messages.map((msg, i) => (
-  <div key={i} className={`message ${msg.role}`}>
-    <div className="bubble">
-      {msg.text}
-      {msg.sources && (
-        <div className="sources">
-          <p className="sources-label">📄 Sources:</p>
-          {msg.sources.map((src, j) => (
-            <div key={j} className="source-item">
-              <span className="source-name">{src.source}</span>
-              <p className="source-preview">{src.preview}</p>
+            <div key={i} className={`message ${msg.role}`}>
+              <div className="bubble">
+                {msg.text}
+                {msg.sources && (
+                  <div className="sources">
+                    <p className="sources-label">📄 Sources:</p>
+                    {msg.sources.map((src, j) => (
+                      <div key={j} className="source-item">
+                        <span className="source-name">{src.source}</span>
+                        <p className="source-preview">{src.preview}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
-        </div>
-      )}
-    </div>
-  </div>
-))}
           {loading && (
             <div className="message bot">
               <div className="bubble loading">Thinking...</div>
@@ -102,7 +149,7 @@ function App() {
             value={question}
             onChange={e => setQuestion(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask a question about your document..."
+            placeholder="Ask anything across all your documents..."
             className="question-input"
           />
           <button onClick={askQuestion} className="ask-btn">Ask</button>
