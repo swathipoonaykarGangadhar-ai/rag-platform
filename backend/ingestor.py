@@ -1,7 +1,14 @@
 import os
-import fitz  # pymupdf
+import json
+import csv
+import fitz
+import whisper
+import pytesseract
+from PIL import Image
 from docx import Document
 from pathlib import Path
+
+pytesseract.pytesseract.tesseract_cmd = r'C:\Users\swath\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
 DATA_DIR = "data"
 
@@ -21,19 +28,58 @@ def extract_text_from_pdf(filepath: str) -> str:
 
 def extract_text_from_docx(filepath: str) -> str:
     doc = Document(filepath)
+    return "\n".join([p.text for p in doc.paragraphs])
+
+def extract_text_from_txt(filepath: str) -> str:
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        return f.read()
+
+def extract_text_from_csv(filepath: str) -> str:
     text = ""
-    for paragraph in doc.paragraphs:
-        text += paragraph.text + "\n"
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            text += " | ".join(row) + "\n"
     return text
+
+def extract_text_from_json(filepath: str) -> str:
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        data = json.load(f)
+    return json.dumps(data, indent=2)
+
+def extract_text_from_md(filepath: str) -> str:
+    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        return f.read()
+
+def extract_text_from_image(filepath: str) -> str:
+    image = Image.open(filepath)
+    return pytesseract.image_to_string(image)
+
+def extract_text_from_audio(filepath: str) -> str:
+    model = whisper.load_model("base")
+    result = model.transcribe(filepath)
+    return result["text"]
 
 def extract_text(filepath: str) -> str:
     ext = Path(filepath).suffix.lower()
-    if ext == ".pdf":
-        return extract_text_from_pdf(filepath)
-    elif ext == ".docx":
-        return extract_text_from_docx(filepath)
-    else:
-        return ""
+    extractors = {
+        ".pdf": extract_text_from_pdf,
+        ".docx": extract_text_from_docx,
+        ".txt": extract_text_from_txt,
+        ".csv": extract_text_from_csv,
+        ".json": extract_text_from_json,
+        ".md": extract_text_from_md,
+        ".png": extract_text_from_image,
+        ".jpg": extract_text_from_image,
+        ".jpeg": extract_text_from_image,
+        ".mp3": extract_text_from_audio,
+        ".wav": extract_text_from_audio,
+        ".m4a": extract_text_from_audio,
+    }
+    extractor = extractors.get(ext)
+    if extractor:
+        return extractor(filepath)
+    return ""
 
 def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list:
     words = text.split()

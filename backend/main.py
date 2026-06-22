@@ -31,8 +31,9 @@ def list_documents():
     data_dir = "data"
     if not os.path.exists(data_dir):
         return {"documents": []}
-    files = [f for f in os.listdir(data_dir) 
-             if f.endswith((".pdf", ".docx"))]
+    allowed = (".pdf", ".docx", ".txt", ".csv", ".json", 
+               ".md", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a")
+    files = [f for f in os.listdir(data_dir) if f.endswith(allowed)]
     return {"documents": files}
 
 @app.delete("/documents/{filename}")

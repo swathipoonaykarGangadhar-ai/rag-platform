@@ -82,7 +82,7 @@ function App() {
           <p className="section-label">Upload Document</p>
           <input
             type="file"
-            accept=".pdf,.docx"
+            accept=".pdf,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.mp3,.wav,.m4a"
             onChange={e => setFile(e.target.files[0])}
             className="file-input"
           />
