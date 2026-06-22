@@ -3,7 +3,8 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from backend.ingestor import save_uploaded_file, extract_text, chunk_text
-from backend.embedder import embed_and_store, search_similar
+from backend.embedder import embed_and_store
+from backend.retriever import search_with_sources
 from backend.generator import generate_answer
 
 load_dotenv()
@@ -40,9 +41,10 @@ async def upload_document(file: UploadFile = File(...)):
 @app.post("/ask")
 async def ask_question(query: dict):
     question = query.get("question", "")
-    chunks = search_similar(question)
-    answer = generate_answer(question, chunks)
+    chunks_with_sources = search_with_sources(question)
+    result = generate_answer(question, chunks_with_sources)
     return {
         "question": question,
-        "answer": answer
+        "answer": result["answer"],
+        "sources": result["sources"]
     }

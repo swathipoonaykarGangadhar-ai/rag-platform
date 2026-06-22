@@ -32,7 +32,7 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.post(`${API}/ask`, { question });
-      const botMsg = { role: 'bot', text: res.data.answer };
+      const botMsg = { role: 'bot', text: res.data.answer, sources: res.data.sources };
       setMessages(prev => [...prev, botMsg]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'bot', text: 'Error getting answer. Try again.' }]);
@@ -72,10 +72,23 @@ function App() {
             </div>
           )}
           {messages.map((msg, i) => (
-            <div key={i} className={`message ${msg.role}`}>
-              <div className="bubble">{msg.text}</div>
+  <div key={i} className={`message ${msg.role}`}>
+    <div className="bubble">
+      {msg.text}
+      {msg.sources && (
+        <div className="sources">
+          <p className="sources-label">📄 Sources:</p>
+          {msg.sources.map((src, j) => (
+            <div key={j} className="source-item">
+              <span className="source-name">{src.source}</span>
+              <p className="source-preview">{src.preview}</p>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  </div>
+))}
           {loading && (
             <div className="message bot">
               <div className="bubble loading">Thinking...</div>
