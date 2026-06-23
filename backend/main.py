@@ -1,4 +1,6 @@
 import os
+from backend.exporter import export_chat_to_pdf
+from fastapi.responses import Response
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -85,3 +87,12 @@ def get_chat_history():
 @app.delete("/history")
 def clear_chat_history():
     return clear_history()
+@app.post("/export/pdf")
+async def export_pdf(data: dict):
+    messages = data.get("messages", [])
+    pdf_bytes = export_chat_to_pdf(messages)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=rag-chat-export.pdf"}
+    )

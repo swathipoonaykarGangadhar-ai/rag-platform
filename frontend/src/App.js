@@ -85,7 +85,27 @@ function App() {
       showToast('Failed to clear history', 'error');
     }
   };
-
+const exportToPDF = async () => {
+  if (messages.length === 0) {
+    showToast('No messages to export', 'error');
+    return;
+  }
+  try {
+    const res = await axios.post(`${API}/export/pdf`, { messages }, {
+      responseType: 'blob'
+    });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'rag-chat-export.pdf');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    showToast('Chat exported as PDF!');
+  } catch {
+    showToast('Export failed. Try again.', 'error');
+  }
+};
   const uploadFile = async () => {
     if (!file) return;
     const formData = new FormData();
@@ -232,7 +252,10 @@ function App() {
 
         <div className="sidebar-footer">
           <button className="footer-btn theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+           {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+          </button>
+          <button className="footer-btn" onClick={exportToPDF} title="Export chat to PDF">
+            📥 Export
           </button>
           <button className="footer-btn" onClick={clearHistory}>
             🗑️ Clear
