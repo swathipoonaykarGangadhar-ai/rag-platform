@@ -176,6 +176,7 @@ function App() {
         role: 'bot',
         text: res.data.answer,
         sources: res.data.sources,
+        confidence: res.data.confidence,
         timestamp: new Date().toLocaleTimeString()
       }]);
     } catch {
@@ -332,6 +333,12 @@ function App() {
                   </div>
                 )}
                 <div className="bubble">
+                  {msg.confidence && (
+                    <div className={`confidence-badge ${msg.confidence.color}`}>
+                      {msg.confidence.color === 'green' ? '✅' : msg.confidence.color === 'yellow' ? '⚠️' : '🚨'}
+                      {' '}{msg.confidence.label} ({msg.confidence.score}%)
+                     </div>
+                  )}
                   {msg.text}
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="sources">

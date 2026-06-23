@@ -4,12 +4,44 @@ from groq import Groq
 api_key = os.environ.get("GROQ_API_KEY", "").strip()
 client = Groq(api_key=api_key)
 
+def calculate_confidence(answer: str, chunks: list) -> dict:
+    if not chunks:
+        return {"score": 0, "label": "No Sources", "color": "gray"}
+    
+    answer_words = set(answer.lower().split())
+    context = " ".join([c.get("text", "") if isinstance(c, dict) else c for c in chunks])
+    context_words = set(context.lower().split())
+    
+    # Remove common stop words
+    stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been",
+                  "have", "has", "had", "do", "does", "did", "will", "would",
+                  "could", "should", "may", "might", "shall", "can", "to",
+                  "of", "in", "on", "at", "by", "for", "with", "about",
+                  "and", "or", "but", "if", "then", "that", "this", "it",
+                  "i", "you", "he", "she", "we", "they", "not", "no"}
+    
+    answer_keywords = answer_words - stop_words
+    
+    if not answer_keywords:
+        return {"score": 50, "label": "Medium Confidence", "color": "yellow"}
+    
+    # Check how many answer keywords appear in source context
+    matched = answer_keywords.intersection(context_words)
+    score = round((len(matched) / len(answer_keywords)) * 100)
+    
+    if score >= 70:
+        return {"score": score, "label": "High Confidence", "color": "green"}
+    elif score >= 40:
+        return {"score": score, "label": "Medium Confidence", "color": "yellow"}
+    else:
+        return {"score": score, "label": "Low Confidence - May Hallucinate", "color": "red"}
+
 def generate_answer(query: str, chunks_with_sources: list) -> dict:
     context = "\n\n".join([
-        c.get("text", c) if isinstance(c, dict) else c 
+        c.get("text", c) if isinstance(c, dict) else c
         for c in chunks_with_sources
     ])
-    
+
     prompt = f"""You are a helpful document assistant.
 Answer the user's question based ONLY on the provided context.
 If the answer is not in the context, say "I couldn't find that in the documents."
@@ -29,6 +61,7 @@ Answer:"""
     )
 
     answer = response.choices[0].message.content
+    confidence = calculate_confidence(answer, chunks_with_sources)
 
     sources = []
     for chunk in chunks_with_sources:
@@ -44,14 +77,14 @@ Answer:"""
 
     return {
         "answer": answer,
-        "sources": sources
+        "sources": sources,
+        "confidence": confidence
     }
 
 def summarize_document(chunks: list) -> str:
-    # Take first 10 chunks for summary to avoid token limits
     sample_chunks = chunks[:10]
     context = "\n\n".join(sample_chunks)
-    
+
     prompt = f"""You are a document analyst. Read the following document content and provide a concise summary in 3-5 sentences covering:
 - What this document is about
 - Key topics or information it contains
@@ -68,5 +101,5 @@ Summary:"""
         temperature=0.3,
         max_tokens=300
     )
-    
+
     return response.choices[0].message.content

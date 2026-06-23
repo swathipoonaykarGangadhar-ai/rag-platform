@@ -108,7 +108,8 @@ async def ask_question(query: dict):
     return {
         "question": question,
         "answer": result["answer"],
-        "sources": result["sources"]
+        "sources": result["sources"],
+        "confidence": result["confidence"]
     }
 
 @app.get("/history")
