@@ -1,3 +1,4 @@
+import AuditDashboard from './AuditDashboard';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
@@ -31,6 +32,7 @@ function App() {
     const saved = localStorage.getItem('rag_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [showAudit, setShowAudit] = useState(false);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [question, setQuestion] = useState('');
@@ -307,6 +309,22 @@ function App() {
               marginLeft: 8
             }}
           >
+          <button
+            onClick={() => setShowAudit(true)}
+            style={{
+              background: 'none',
+              border: '1px solid #30363d',
+              color: '#8b949e',
+              borderRadius: 6,
+              padding: '4px 12px',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontFamily: 'Inter, sans-serif',
+              marginLeft: 8
+            }}
+          >
+            📋 Audit
+          </button>
             Sign Out
           </button>
         </div>
@@ -396,6 +414,7 @@ function App() {
           onClose={() => setToast(null)}
         />
       )}
+      {showAudit && <AuditDashboard onClose={() => setShowAudit(false)} />}
     </div>
   );
 }

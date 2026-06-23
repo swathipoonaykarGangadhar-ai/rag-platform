@@ -1,4 +1,5 @@
 import os
+from backend.audit import log_query, get_audit_logs, get_audit_stats
 from fastapi import FastAPI, UploadFile, File, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -98,19 +99,54 @@ async def summarize_doc(filename: str):
     return {"filename": filename, "summary": summary}
 
 @app.post("/ask")
-async def ask_question(query: dict):
+async def ask_question(query: dict, authorization: str = Header(None)):
+    import time
     question = query.get("question", "")
+    start_time = time.time()
+    
     chunks_with_sources = hybrid_search(question)
     if not chunks_with_sources:
         chunks_with_sources = search_with_sources(question)
+    
     result = generate_answer(question, chunks_with_sources)
+    
+    response_time = int((time.time() - start_time) * 1000)
+    
+    # Get user email from token
+    user_email = "anonymous"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token)
+        if email:
+            user_email = email
+    
+    # Log to audit trail
+    log_query(
+        user_email=user_email,
+        question=question,
+        answer=result["answer"],
+        sources=result["sources"],
+        confidence=result["confidence"],
+        response_time_ms=response_time
+    )
+    
     save_message(question, result["answer"], result["sources"])
+    
     return {
         "question": question,
         "answer": result["answer"],
         "sources": result["sources"],
-        "confidence": result["confidence"]
+        "confidence": result["confidence"],
+        "response_time_ms": response_time
     }
+
+@app.get("/audit/logs")
+def get_logs():
+    return {"logs": get_audit_logs()}
+
+@app.get("/audit/stats")
+def get_stats():
+    return get_audit_stats()
 
 @app.get("/history")
 def get_chat_history():
