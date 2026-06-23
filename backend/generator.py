@@ -5,7 +5,10 @@ api_key = os.environ.get("GROQ_API_KEY", "").strip()
 client = Groq(api_key=api_key)
 
 def generate_answer(query: str, chunks_with_sources: list) -> dict:
-    context = "\n\n".join([c["text"] for c in chunks_with_sources])
+    context = "\n\n".join([
+        c.get("text", c) if isinstance(c, dict) else c 
+        for c in chunks_with_sources
+    ])
     
     prompt = f"""You are a helpful document assistant.
 Answer the user's question based ONLY on the provided context.
@@ -24,21 +27,26 @@ Answer:"""
         temperature=0.1,
         max_tokens=1024
     )
-    
+
     answer = response.choices[0].message.content
-    
+
     sources = []
     for chunk in chunks_with_sources:
-        sources.append({
-            "source": chunk["source"],
-            "chunk_index": chunk["chunk_index"],
-            "preview": chunk["text"][:150] + "..."
-        })
-    
+        if isinstance(chunk, dict):
+            sources.append({
+                "source": chunk.get("source", "Unknown"),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "preview": chunk.get("text", "")[:150] + "...",
+                "hybrid_score": round(chunk.get("hybrid_score", 0), 3),
+                "vector_score": chunk.get("vector_score", 0),
+                "bm25_score": chunk.get("bm25_score", 0)
+            })
+
     return {
         "answer": answer,
         "sources": sources
     }
+
 def summarize_document(chunks: list) -> str:
     # Take first 10 chunks for summary to avoid token limits
     sample_chunks = chunks[:10]

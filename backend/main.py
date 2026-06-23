@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from backend.ingestor import save_uploaded_file, extract_text, chunk_text
 from backend.embedder import embed_and_store
 from backend.retriever import search_with_sources
+from backend.hybrid_search import hybrid_search
 from backend.generator import generate_answer
 from backend.history import save_message, get_history, clear_history
 from backend.generator import generate_answer, summarize_document
@@ -68,10 +69,18 @@ async def summarize_doc(filename: str):
         return {"summary": "Could not extract text from this document."}
     summary = summarize_document(chunks)
     return {"filename": filename, "summary": summary}
+
 @app.post("/ask")
 async def ask_question(query: dict):
     question = query.get("question", "")
-    chunks_with_sources = search_with_sources(question)
+    
+    # Use hybrid search instead of pure vector search
+    chunks_with_sources = hybrid_search(question)
+    
+    if not chunks_with_sources:
+        # Fallback to vector search if hybrid fails
+        chunks_with_sources = search_with_sources(question)
+    
     result = generate_answer(question, chunks_with_sources)
     save_message(question, result["answer"], result["sources"])
     return {
