@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
+import Login from './Login';
 
 const API = 'http://127.0.0.1:8000';
 
@@ -26,6 +27,10 @@ function Toast({ message, type, onClose }) {
 }
 
 function App() {
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('rag_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [question, setQuestion] = useState('');
@@ -45,9 +50,11 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
-    fetchDocuments();
-    fetchHistory();
-  }, []);
+    if (user) {
+      fetchDocuments();
+      fetchHistory();
+    }
+  }, [user]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,6 +62,18 @@ function App() {
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
+  };
+
+  const handleLogin = (userData) => {
+    setUser(userData);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('rag_token');
+    localStorage.removeItem('rag_user');
+    setUser(null);
+    setMessages([]);
+    setDocuments([]);
   };
 
   const fetchDocuments = async () => {
@@ -85,27 +104,29 @@ function App() {
       showToast('Failed to clear history', 'error');
     }
   };
-const exportToPDF = async () => {
-  if (messages.length === 0) {
-    showToast('No messages to export', 'error');
-    return;
-  }
-  try {
-    const res = await axios.post(`${API}/export/pdf`, { messages }, {
-      responseType: 'blob'
-    });
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'rag-chat-export.pdf');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    showToast('Chat exported as PDF!');
-  } catch {
-    showToast('Export failed. Try again.', 'error');
-  }
-};
+
+  const exportToPDF = async () => {
+    if (messages.length === 0) {
+      showToast('No messages to export', 'error');
+      return;
+    }
+    try {
+      const res = await axios.post(`${API}/export/pdf`, { messages }, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'rag-chat-export.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast('Chat exported as PDF!');
+    } catch {
+      showToast('Export failed. Try again.', 'error');
+    }
+  };
+
   const uploadFile = async () => {
     if (!file) return;
     const formData = new FormData();
@@ -113,7 +134,7 @@ const exportToPDF = async () => {
     setUploading(true);
     try {
       const res = await axios.post(`${API}/upload`, formData);
-      showToast(`✓ ${file.name} — ${res.data.chunks_stored} chunks indexed`);
+      showToast(`Done - ${res.data.chunks_stored} chunks indexed`);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchDocuments();
@@ -127,7 +148,7 @@ const exportToPDF = async () => {
     try {
       await axios.delete(`${API}/documents/${filename}`);
       fetchDocuments();
-      showToast(`Deleted ${filename}`);
+      showToast('Document deleted');
     } catch {
       showToast('Failed to delete', 'error');
     }
@@ -170,9 +191,12 @@ const exportToPDF = async () => {
 
   const getFileExt = (filename) => filename.split('.').pop().toUpperCase();
 
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className="app">
-      {/* Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? '' : 'collapsed'}`}>
         <div className="sidebar-header">
           <div className="brand">
@@ -181,16 +205,13 @@ const exportToPDF = async () => {
           </div>
           <div className="brand-sub">Document Intelligence</div>
         </div>
-
         <div className="sidebar-body">
-          {/* Upload */}
           <div>
             <div className="section-label">Upload Document</div>
             <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
               <div className="upload-icon">📂</div>
               <div className="upload-label">
                 {file ? file.name : 'Click to choose a file'}
-                <br />PDF, Word, CSV, Images, Audio
               </div>
               <input
                 ref={fileInputRef}
@@ -207,17 +228,15 @@ const exportToPDF = async () => {
                 disabled={uploading}
                 style={{ marginTop: 8 }}
               >
-                {uploading ? 'Uploading...' : `Upload ${file.name}`}
+                {uploading ? 'Uploading...' : 'Upload ' + file.name}
               </button>
             )}
           </div>
-
-          {/* Documents */}
           <div>
             <div className="section-label">Documents ({documents.length})</div>
             <div className="docs-list">
               {documents.length === 0 && (
-                <div className="no-docs">No documents yet — upload one above</div>
+                <div className="no-docs">No documents yet</div>
               )}
               {documents.map((doc, i) => (
                 <div key={i}>
@@ -241,7 +260,7 @@ const exportToPDF = async () => {
                     <div className="doc-summary">
                       {summaries[doc] === 'loading'
                         ? <span className="summary-loading">Summarizing...</span>
-                        : summaries[doc] || 'Click ✦ to summarize'}
+                        : summaries[doc] || 'Click to summarize'}
                     </div>
                   )}
                 </div>
@@ -249,21 +268,18 @@ const exportToPDF = async () => {
             </div>
           </div>
         </div>
-
         <div className="sidebar-footer">
           <button className="footer-btn theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-           {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+            {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
-          <button className="footer-btn" onClick={exportToPDF} title="Export chat to PDF">
-            📥 Export
+          <button className="footer-btn" onClick={exportToPDF}>
+            Export
           </button>
           <button className="footer-btn" onClick={clearHistory}>
-            🗑️ Clear
+            Clear
           </button>
         </div>
       </aside>
-
-      {/* Main */}
       <main className="main">
         <div className="topbar">
           <button className="toggle-sidebar-btn" onClick={() => setSidebarOpen(o => !o)}>
@@ -273,17 +289,33 @@ const exportToPDF = async () => {
           {messages.length > 0 && (
             <span className="msg-badge">{messages.length} messages</span>
           )}
-          <span className="topbar-sub">Search across {documents.length} documents</span>
+          <span className="topbar-sub">
+            {user.username || user.email} · {documents.length} docs
+          </span>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'none',
+              border: '1px solid #30363d',
+              color: '#8b949e',
+              borderRadius: 6,
+              padding: '4px 12px',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontFamily: 'Inter, sans-serif',
+              marginLeft: 8
+            }}
+          >
+            Sign Out
+          </button>
         </div>
-
         <div className="messages">
           {messages.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">🧠</div>
               <div className="empty-title">Ask anything about your documents</div>
               <div className="empty-sub">
-                Upload documents on the left, then ask questions.<br />
-                The AI searches across all your files instantly.
+                Upload documents on the left, then ask questions.
               </div>
               <div className="empty-chips">
                 {SAMPLE_QUESTIONS.map((q, i) => (
@@ -293,7 +325,7 @@ const exportToPDF = async () => {
             </div>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className={`message ${msg.role}`}>
+              <div key={i} className={'message ' + msg.role}>
                 {msg.timestamp && (
                   <div className="msg-meta">
                     {msg.role === 'user' ? 'You' : 'AI'} · {msg.timestamp}
@@ -328,7 +360,6 @@ const exportToPDF = async () => {
           )}
           <div ref={messagesEndRef} />
         </div>
-
         <div className="input-area">
           <div className="input-wrap">
             <textarea
@@ -341,17 +372,16 @@ const exportToPDF = async () => {
                   askQuestion();
                 }
               }}
-              placeholder="Ask anything across your documents... (Enter to send)"
+              placeholder="Ask anything... (Enter to send)"
               rows={1}
             />
             <button className="ask-btn" onClick={() => askQuestion()} disabled={loading}>
               ➤
             </button>
           </div>
-          <div className="input-hint">Press Enter to send · Shift+Enter for new line</div>
+          <div className="input-hint">Enter to send · Shift+Enter for new line</div>
         </div>
       </main>
-
       {toast && (
         <Toast
           message={toast.message}
