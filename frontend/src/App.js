@@ -1,3 +1,4 @@
+import Analytics from './Analytics';
 import DocumentComparison from './DocumentComparison';
 import AuditDashboard from './AuditDashboard';
 import React, { useState, useEffect, useRef } from 'react';
@@ -33,6 +34,7 @@ function App() {
     const saved = localStorage.getItem('rag_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
   const [file, setFile] = useState(null);
@@ -333,6 +335,22 @@ function App() {
             }}
           >
             <button
+              onClick={() => setShowAnalytics(true)}
+              style={{
+                background: 'none',
+                border: '1px solid #30363d',
+                color: '#8b949e',
+                borderRadius: 6,
+                padding: '4px 12px',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontFamily: 'Inter, sans-serif',
+                marginLeft: 8
+              }}
+            >
+             📈 Analytics
+            </button>
+            <button
               onClick={() => setShowComparison(true)}
               style={{
                 background: 'none',
@@ -484,6 +502,7 @@ function App() {
           onClose={() => setShowComparison(false)}
         />
       )}
+      {showAnalytics && <Analytics onClose={() => setShowAnalytics(false)} />}
     </div>
   );
 }
