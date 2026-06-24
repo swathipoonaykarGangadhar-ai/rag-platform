@@ -51,6 +51,8 @@ function App() {
   const [showComparison, setShowComparison] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [allTags, setAllTags] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -63,6 +65,7 @@ function App() {
     if (user) {
       fetchDocuments();
       fetchHistory();
+      fetchTags();
     }
   }, [user]);
 
@@ -90,6 +93,13 @@ function App() {
     try {
       const res = await axios.get(`${API}/documents`);
       setDocuments(res.data.documents);
+    } catch {}
+  };
+
+  const fetchTags = async () => {
+    try {
+      const res = await axios.get(`${API}/tags`);
+      setAllTags(res.data.tags);
     } catch {}
   };
 
@@ -145,9 +155,13 @@ function App() {
     try {
       const res = await axios.post(`${API}/upload`, formData);
       showToast('Done - ' + res.data.chunks_stored + ' chunks indexed');
+      if (res.data.tags && res.data.tags.category) {
+        showToast('Tagged as: ' + res.data.tags.category + ' - ' + res.data.tags.type);
+      }
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchDocuments();
+      fetchTags();
     } catch {
       showToast('Upload failed. Please try again.', 'error');
     }
@@ -158,6 +172,7 @@ function App() {
     try {
       await axios.delete(`${API}/documents/${filename}`);
       fetchDocuments();
+      fetchTags();
       showToast('Document deleted');
     } catch {
       showToast('Failed to delete', 'error');
@@ -269,7 +284,9 @@ function App() {
           </div>
           <div className="brand-sub">Document Intelligence</div>
         </div>
+
         <div className="sidebar-body">
+          {/* Upload */}
           <div>
             <div className="section-label">Upload Document</div>
             <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
@@ -296,42 +313,79 @@ function App() {
               </button>
             )}
           </div>
+
+          {/* Documents with Tags */}
           <div>
             <div className="section-label">Documents ({documents.length})</div>
+
+            <div className="category-filter">
+              {['All', 'Technical', 'HR', 'Finance', 'Legal', 'Personal', 'Other'].map(cat => (
+                <button
+                  key={cat}
+                  className={'cat-btn ' + (selectedCategory === cat ? 'active' : '')}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             <div className="docs-list">
               {documents.length === 0 && (
                 <div className="no-docs">No documents yet</div>
               )}
-              {documents.map((doc, i) => (
-                <div key={i}>
-                  <div className="doc-item">
-                    <span className="doc-type-icon">{getFileIcon(doc)}</span>
-                    <div className="doc-info">
-                      <div className="doc-name">{doc}</div>
-                      <div className="doc-type">{getFileExt(doc)}</div>
+              {documents
+                .filter(doc => {
+                  if (selectedCategory === 'All') return true;
+                  const tag = allTags.find(t => t.filename === doc);
+                  return tag && tag.category === selectedCategory;
+                })
+                .map((doc, i) => {
+                  const tag = allTags.find(t => t.filename === doc);
+                  return (
+                    <div key={i}>
+                      <div className="doc-item">
+                        <span className="doc-type-icon">{getFileIcon(doc)}</span>
+                        <div className="doc-info">
+                          <div className="doc-name">{doc}</div>
+                          <div className="doc-type-row">
+                            <span className="doc-type">{getFileExt(doc)}</span>
+                            {tag && tag.category && (
+                              <span className="doc-category-tag">{tag.category}</span>
+                            )}
+                          </div>
+                          {tag && tag.topics && tag.topics.length > 0 && (
+                            <div className="doc-topics">
+                              {tag.topics.slice(0, 2).map((topic, j) => (
+                                <span key={j} className="topic-chip">{topic}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className="doc-summarize"
+                          onClick={() => {
+                            setExpandedDoc(expandedDoc === doc ? null : doc);
+                            if (!summaries[doc]) summarizeDocument(doc);
+                          }}
+                          title="Summarize"
+                        >✦</button>
+                        <button className="doc-delete" onClick={() => deleteDocument(doc)}>✕</button>
+                      </div>
+                      {expandedDoc === doc && (
+                        <div className="doc-summary">
+                          {summaries[doc] === 'loading'
+                            ? <span className="summary-loading">Summarizing...</span>
+                            : summaries[doc] || 'Click to summarize'}
+                        </div>
+                      )}
                     </div>
-                    <button
-                      className="doc-summarize"
-                      onClick={() => {
-                        setExpandedDoc(expandedDoc === doc ? null : doc);
-                        if (!summaries[doc]) summarizeDocument(doc);
-                      }}
-                      title="Summarize"
-                    >✦</button>
-                    <button className="doc-delete" onClick={() => deleteDocument(doc)}>✕</button>
-                  </div>
-                  {expandedDoc === doc && (
-                    <div className="doc-summary">
-                      {summaries[doc] === 'loading'
-                        ? <span className="summary-loading">Summarizing...</span>
-                        : summaries[doc] || 'Click to summarize'}
-                    </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
             </div>
           </div>
         </div>
+
         <div className="sidebar-footer">
           <button className="footer-btn theme-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
             {theme === 'dark' ? 'Light' : 'Dark'}

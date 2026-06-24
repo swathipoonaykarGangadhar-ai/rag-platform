@@ -1,3 +1,4 @@
+import json
 import os
 from groq import Groq
 
@@ -192,3 +193,38 @@ Format your response clearly with these exact section headers."""
         "doc1": doc1_name,
         "doc2": doc2_name
     }
+def tag_document(chunks: list, filename: str) -> dict:
+    sample_text = "\n\n".join(chunks[:5])
+
+    prompt = f"""You are a document classifier. Analyze this document and return ONLY a JSON object with these fields:
+- category: one of [Technical, Legal, Finance, HR, Marketing, Research, Personal, Other]
+- topics: array of 3-5 key topics found in the document
+- type: one of [Resume, Report, Interview, Guide, Contract, Presentation, Data, Email, Other]
+- summary_line: one sentence describing the document
+
+Document filename: {filename}
+Document content:
+{sample_text}
+
+Return ONLY valid JSON, no other text:"""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=200
+    )
+
+    try:
+        raw = response.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1].replace("json", "").strip()
+        tags = json.loads(raw)
+        return tags
+    except:
+        return {
+            "category": "Other",
+            "topics": [],
+            "type": "Other",
+            "summary_line": filename
+        }

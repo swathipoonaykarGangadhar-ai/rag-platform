@@ -1,4 +1,6 @@
 import os
+from backend.tags import save_tags, get_tags, get_all_tags, delete_tags
+from backend.generator import generate_answer, generate_answer_with_memory, summarize_document, compare_documents, tag_document
 from backend.generator import generate_answer, generate_answer_with_memory, summarize_document, compare_documents
 from backend.generator import generate_answer, generate_answer_with_memory, summarize_document
 from backend.agent import run_agent
@@ -75,6 +77,7 @@ def delete_document(filename: str):
     filepath = os.path.join("data", filename)
     if os.path.exists(filepath):
         os.remove(filepath)
+    delete_tags(filename)
     return {"message": f"Deleted {filename}"}
 
 @app.post("/upload")
@@ -84,10 +87,29 @@ async def upload_document(file: UploadFile = File(...)):
     text = extract_text(filepath)
     chunks = chunk_text(text)
     count = embed_and_store(chunks, file.filename)
+
+    # Auto tag the document
+    if chunks:
+        tags = tag_document(chunks, file.filename)
+        save_tags(file.filename, tags)
+
     return {
         "message": f"Successfully processed {file.filename}",
-        "chunks_stored": count
+        "chunks_stored": count,
+        "tags": tags if chunks else {}
     }
+@app.get("/tags")
+def list_all_tags():
+    return {"tags": get_all_tags()}
+
+@app.get("/tags/{filename}")
+def get_document_tags(filename: str):
+    return get_tags(filename)
+
+@app.delete("/tags/{filename}")
+def remove_tags(filename: str):
+    delete_tags(filename)
+    return {"message": f"Tags deleted for {filename}"}
 
 @app.post("/summarize/{filename}")
 async def summarize_doc(filename: str):
