@@ -158,3 +158,37 @@ Answer:"""
         "sources": sources,
         "confidence": confidence
     }
+def compare_documents(doc1_chunks: list, doc2_chunks: list, doc1_name: str, doc2_name: str) -> dict:
+    doc1_text = "\n\n".join(doc1_chunks[:3])
+    doc2_text = "\n\n".join(doc2_chunks[:3])
+
+    prompt = f"""You are an expert document analyst. Compare these two documents and provide a detailed analysis.
+
+Document 1: {doc1_name}
+{doc1_text}
+
+Document 2: {doc2_name}
+{doc2_text}
+
+Provide a structured comparison with these sections:
+1. OVERVIEW - Brief summary of each document
+2. SIMILARITIES - Key topics or points both documents share
+3. DIFFERENCES - Key differences between the documents
+4. UNIQUE TO DOC 1 - Important points only in {doc1_name}
+5. UNIQUE TO DOC 2 - Important points only in {doc2_name}
+6. RECOMMENDATION - Which document is more comprehensive or relevant for what purpose
+
+Format your response clearly with these exact section headers."""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=1000
+    )
+
+    return {
+        "comparison": response.choices[0].message.content,
+        "doc1": doc1_name,
+        "doc2": doc2_name
+    }

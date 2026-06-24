@@ -1,4 +1,5 @@
 import os
+from backend.generator import generate_answer, generate_answer_with_memory, summarize_document, compare_documents
 from backend.generator import generate_answer, generate_answer_with_memory, summarize_document
 from backend.agent import run_agent
 from backend.audit import log_query, get_audit_logs, get_audit_stats
@@ -209,3 +210,25 @@ async def export_pdf(data: dict):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=rag-chat-export.pdf"}
     )
+@app.post("/compare")
+async def compare_docs(data: dict):
+    doc1 = data.get("doc1", "")
+    doc2 = data.get("doc2", "")
+
+    if not doc1 or not doc2:
+        return {"error": "Please provide two documents to compare"}
+
+    filepath1 = os.path.join("data", doc1)
+    filepath2 = os.path.join("data", doc2)
+
+    if not os.path.exists(filepath1) or not os.path.exists(filepath2):
+        return {"error": "One or both documents not found"}
+
+    text1 = extract_text(filepath1)
+    text2 = extract_text(filepath2)
+
+    chunks1 = chunk_text(text1)
+    chunks2 = chunk_text(text2)
+
+    result = compare_documents(chunks1, chunks2, doc1, doc2)
+    return result

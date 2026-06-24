@@ -1,3 +1,4 @@
+import DocumentComparison from './DocumentComparison';
 import AuditDashboard from './AuditDashboard';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
@@ -32,6 +33,7 @@ function App() {
     const saved = localStorage.getItem('rag_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [showComparison, setShowComparison] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -330,6 +332,22 @@ function App() {
               marginLeft: 8
             }}
           >
+            <button
+              onClick={() => setShowComparison(true)}
+              style={{
+                background: 'none',
+                border: '1px solid #30363d',
+                color: '#8b949e',
+                borderRadius: 6,
+                padding: '4px 12px',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontFamily: 'Inter, sans-serif',
+                marginLeft: 8
+              }}
+            >
+              📊 Compare
+            </button>
           <button
             onClick={() => setShowAudit(true)}
             style={{
@@ -460,6 +478,12 @@ function App() {
         />
       )}
       {showAudit && <AuditDashboard onClose={() => setShowAudit(false)} />}
+      {showComparison && (
+        <DocumentComparison
+          documents={documents}
+          onClose={() => setShowComparison(false)}
+        />
+      )}
     </div>
   );
 }
