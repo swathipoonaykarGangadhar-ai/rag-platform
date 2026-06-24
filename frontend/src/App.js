@@ -46,6 +46,8 @@ function App() {
   const [expandedDoc, setExpandedDoc] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [agentMode, setAgentMode] = useState(false);
+  const [agentSteps, setAgentSteps] = useState([]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -167,25 +169,33 @@ function App() {
   };
 
   const askQuestion = async (q) => {
-    const text = q || question;
-    if (!text.trim() || loading) return;
-    setMessages(prev => [...prev, { role: 'user', text }]);
-    setQuestion('');
-    setLoading(true);
-    try {
-      const res = await axios.post(`${API}/ask`, { question: text });
-      setMessages(prev => [...prev, {
-        role: 'bot',
-        text: res.data.answer,
-        sources: res.data.sources,
-        confidence: res.data.confidence,
-        timestamp: new Date().toLocaleTimeString()
-      }]);
-    } catch {
-      setMessages(prev => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
-    }
-    setLoading(false);
-  };
+  const text = q || question;
+  if (!text.trim() || loading) return;
+  setMessages(prev => [...prev, { role: 'user', text }]);
+  setQuestion('');
+  setLoading(true);
+  setAgentSteps([]);
+  try {
+    const endpoint = agentMode ? `${API}/agent` : `${API}/ask`;
+    const token = localStorage.getItem('rag_token');
+    const res = await axios.post(endpoint, { question: text }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    setMessages(prev => [...prev, {
+      role: 'bot',
+      text: res.data.answer,
+      sources: res.data.sources,
+      confidence: res.data.confidence,
+      steps: res.data.steps,
+      isAgent: agentMode,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
+    if (res.data.steps) setAgentSteps(res.data.steps);
+  } catch {
+    setMessages(prev => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
+  }
+  setLoading(false);
+};
 
   const getFileIcon = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
@@ -351,26 +361,39 @@ function App() {
                   </div>
                 )}
                 <div className="bubble">
-                  {msg.confidence && (
-                    <div className={`confidence-badge ${msg.confidence.color}`}>
-                      {msg.confidence.color === 'green' ? '✅' : msg.confidence.color === 'yellow' ? '⚠️' : '🚨'}
-                      {' '}{msg.confidence.label} ({msg.confidence.score}%)
-                     </div>
-                  )}
-                  {msg.text}
-                  {msg.sources && msg.sources.length > 0 && (
-                    <div className="sources">
-                      <div className="sources-label">Sources</div>
-                      {msg.sources.slice(0, 3).map((src, j) => (
-                        <div key={j} className="source-item">
-                          <div className="source-name">{src.source}</div>
-                          <div className="source-preview">{src.preview}</div>
+                  {msg.isAgent && msg.steps && (
+                    <div className="agent-steps">
+                      <div className="agent-steps-title">🤖 Agent Research Steps</div>
+                       {msg.steps.map((step, j) => (
+                        <div key={j} className="agent-step">
+                          <span className="step-icon">
+                             {step.step === 'Planning' ? '🗺️' : step.step === 'Searching' ? '🔍' : '🧠'}
+                          </span>
+                          <span className="step-desc">{step.description}</span>
                         </div>
                       ))}
                     </div>
                   )}
+                  {msg.confidence && (
+                    <div className={`confidence-badge ${msg.confidence.color}`}>
+                      {msg.confidence.color === 'green' ? '✅' : msg.confidence.color === 'yellow' ? '⚠️' : '🚨'}
+                      {' '}{msg.confidence.label} ({msg.confidence.score}%)
+                    </div>
+                  )}
+                  {msg.text}
+                  {msg.sources && msg.sources.length > 0 && (
+                   <div className="sources">
+                    <div className="sources-label">Sources</div>
+                    {msg.sources.slice(0, 3).map((src, j) => (
+                     <div key={j} className="source-item">
+                      <div className="source-name">{src.source}</div>
+                      <div className="source-preview">{src.preview}</div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
             ))
           )}
           {loading && (
@@ -386,26 +409,37 @@ function App() {
           <div ref={messagesEndRef} />
         </div>
         <div className="input-area">
-          <div className="input-wrap">
-            <textarea
-              className="question-input"
-              value={question}
-              onChange={e => setQuestion(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  askQuestion();
-                }
-              }}
-              placeholder="Ask anything... (Enter to send)"
-              rows={1}
-            />
-            <button className="ask-btn" onClick={() => askQuestion()} disabled={loading}>
-              ➤
-            </button>
-          </div>
-          <div className="input-hint">Enter to send · Shift+Enter for new line</div>
+          <div className="agent-toggle">
+          <button
+           className={`agent-btn ${agentMode ? 'active' : ''}`}
+           onClick={() => setAgentMode(m => !m)}
+          >
+           {agentMode ? '🤖 Agent Mode ON' : '💬 Standard Mode'}
+          </button>
+          {agentMode && (
+             <span className="agent-hint">AI will search multiple times for deeper answers</span>
+          )}
         </div>
+        <div className="input-wrap">
+         <textarea
+           className="question-input"
+           value={question}
+           onChange={e => setQuestion(e.target.value)}
+           onKeyDown={e => {
+             if (e.key === 'Enter' && !e.shiftKey) {
+               e.preventDefault();
+               askQuestion();
+              }
+            }}
+            placeholder={agentMode ? "Ask a complex question... Agent will research deeply" : "Ask anything... (Enter to send)"}
+            rows={1}
+          />
+          <button className="ask-btn" onClick={() => askQuestion()} disabled={loading}>
+            ➤
+          </button>
+        </div>
+      <div className="input-hint">Enter to send · Shift+Enter for new line</div>
+    </div>
       </main>
       {toast && (
         <Toast

@@ -1,4 +1,5 @@
 import os
+from backend.agent import run_agent
 from backend.audit import log_query, get_audit_logs, get_audit_stats
 from fastapi import FastAPI, UploadFile, File, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -137,6 +138,45 @@ async def ask_question(query: dict, authorization: str = Header(None)):
         "answer": result["answer"],
         "sources": result["sources"],
         "confidence": result["confidence"],
+        "response_time_ms": response_time
+    }
+
+@app.post("/agent")
+async def agent_question(query: dict, authorization: str = Header(None)):
+    import time
+    question = query.get("question", "")
+    start_time = time.time()
+
+    result = run_agent(question)
+
+    response_time = int((time.time() - start_time) * 1000)
+
+    user_email = "anonymous"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token)
+        if email:
+            user_email = email
+
+    log_query(
+        user_email=user_email,
+        question=f"[AGENT] {question}",
+        answer=result["answer"],
+        sources=result["sources"],
+        confidence=result["confidence"],
+        response_time_ms=response_time
+    )
+
+    save_message(question, result["answer"], result["sources"])
+
+    return {
+        "question": question,
+        "answer": result["answer"],
+        "steps": result["steps"],
+        "sources": result["sources"],
+        "confidence": result["confidence"],
+        "total_chunks_searched": result["total_chunks_searched"],
+        "sources_searched": result["sources_searched"],
         "response_time_ms": response_time
     }
 
