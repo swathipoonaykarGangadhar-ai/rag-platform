@@ -5,6 +5,7 @@ import Login from './Login';
 import AuditDashboard from './AuditDashboard';
 import DocumentComparison from './DocumentComparison';
 import Analytics from './Analytics';
+import Workspace from './Workspace';
 
 const API = 'http://127.0.0.1:8000';
 
@@ -50,9 +51,11 @@ function App() {
   const [showAudit, setShowAudit] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showWorkspace, setShowWorkspace] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [allTags, setAllTags] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [currentWorkspace, setCurrentWorkspace] = useState('default');
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -98,6 +101,9 @@ function App() {
       setDocuments(res.data.documents);
       if (res.data.role) {
         setUser(prev => ({ ...prev, role: res.data.role }));
+      }
+      if (res.data.workspace) {
+        setCurrentWorkspace(res.data.workspace);
       }
     } catch {}
   };
@@ -165,7 +171,7 @@ function App() {
       });
       showToast('Done - ' + res.data.chunks_stored + ' chunks indexed');
       if (res.data.tags && res.data.tags.category) {
-        showToast('Tagged as: ' + res.data.tags.category + ' - ' + res.data.tags.type);
+        showToast('Tagged as: ' + res.data.tags.category);
       }
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -269,9 +275,7 @@ function App() {
         .join('');
       setQuestion(transcript);
     };
-    recognition.onend = () => {
-      setIsListening(false);
-    };
+    recognition.onend = () => setIsListening(false);
     recognition.onerror = () => {
       setIsListening(false);
       showToast('Voice input error. Try again.', 'error');
@@ -305,7 +309,9 @@ function App() {
             <div className="brand-icon">🧠</div>
             <h1>RAG Platform</h1>
           </div>
-          <div className="brand-sub">Document Intelligence</div>
+          <div className="brand-sub">
+            {currentWorkspace !== 'default' ? '🏢 ' + currentWorkspace : 'Document Intelligence'}
+          </div>
         </div>
 
         <div className="sidebar-body">
@@ -353,14 +359,11 @@ function App() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div className="section-label" style={{ margin: 0 }}>Documents ({documents.length})</div>
-              <button
-                onClick={tagAllDocuments}
-                style={{
-                  background: 'none', border: '1px solid #30363d',
-                  color: '#8b949e', borderRadius: 6, padding: '2px 8px',
-                  cursor: 'pointer', fontSize: 10, fontFamily: 'Inter, sans-serif'
-                }}
-              >
+              <button onClick={tagAllDocuments} style={{
+                background: 'none', border: '1px solid #30363d',
+                color: '#8b949e', borderRadius: 6, padding: '2px 8px',
+                cursor: 'pointer', fontSize: 10, fontFamily: 'Inter, sans-serif'
+              }}>
                 🏷️ Tag All
               </button>
             </div>
@@ -458,44 +461,44 @@ function App() {
           <span className="topbar-sub">
             {user.username || user.email} · {user.role || 'editor'} · {documents.length} docs
           </span>
-          <button
-            onClick={() => setShowAnalytics(true)}
-            style={{
-              background: 'none', border: '1px solid #30363d',
-              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
-              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
-              marginLeft: 8
-            }}>
+          <button onClick={() => setShowWorkspace(true)} style={{
+            background: 'none', border: '1px solid #30363d',
+            color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+            marginLeft: 8
+          }}>
+            🏢 Workspace
+          </button>
+          <button onClick={() => setShowAnalytics(true)} style={{
+            background: 'none', border: '1px solid #30363d',
+            color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+            marginLeft: 8
+          }}>
             📈 Analytics
           </button>
-          <button
-            onClick={() => setShowComparison(true)}
-            style={{
-              background: 'none', border: '1px solid #30363d',
-              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
-              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
-              marginLeft: 8
-            }}>
+          <button onClick={() => setShowComparison(true)} style={{
+            background: 'none', border: '1px solid #30363d',
+            color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+            marginLeft: 8
+          }}>
             📊 Compare
           </button>
-          <button
-            onClick={() => setShowAudit(true)}
-            style={{
-              background: 'none', border: '1px solid #30363d',
-              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
-              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
-              marginLeft: 8
-            }}>
+          <button onClick={() => setShowAudit(true)} style={{
+            background: 'none', border: '1px solid #30363d',
+            color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+            marginLeft: 8
+          }}>
             📋 Audit
           </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              background: 'none', border: '1px solid #30363d',
-              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
-              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
-              marginLeft: 8
-            }}>
+          <button onClick={handleLogout} style={{
+            background: 'none', border: '1px solid #30363d',
+            color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+            cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+            marginLeft: 8
+          }}>
             Sign Out
           </button>
         </div>
@@ -627,6 +630,12 @@ function App() {
         />
       )}
       {showAnalytics && <Analytics onClose={() => setShowAnalytics(false)} />}
+      {showWorkspace && (
+        <Workspace
+          user={user}
+          onClose={() => { setShowWorkspace(false); fetchDocuments(); }}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,9 @@
 import os
+from backend.workspace import (
+    create_workspace, get_workspaces, get_user_workspace,
+    get_workspace_members, add_member, remove_member,
+    get_workspace_documents, add_workspace_document, remove_workspace_document
+)
 from backend.auth import register_user, login_user, verify_token, get_user, get_all_users, update_user_role
 from backend.rbac import can_do, set_document_owner, get_accessible_documents, can_access_document
 from backend.tags import save_tags, get_tags, get_all_tags, delete_tags
@@ -67,24 +72,36 @@ def login(data: dict):
 def list_documents(authorization: str = Header(None)):
     data_dir = "data"
     if not os.path.exists(data_dir):
-        return {"documents": []}
+        return {"documents": [], "role": "viewer", "workspace": "default"}
     allowed = (".pdf", ".docx", ".txt", ".csv",
                ".md", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a")
-    files = [f for f in os.listdir(data_dir)
+    all_files = [f for f in os.listdir(data_dir)
              if f.endswith(allowed) and f != "chat_history.json"]
 
-    # Filter by role
     email = "anonymous"
     role = "viewer"
+    workspace_id = "default"
+
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         email = verify_token(token) or "anonymous"
         user = get_user(email)
         if user:
             role = user.get("role", "viewer")
+            workspace_id = get_user_workspace(email)
+
+    # Filter by workspace if not default
+    if workspace_id != "default":
+        workspace_docs = get_workspace_documents(workspace_id)
+        if workspace_docs:
+            files = [f for f in all_files if f in workspace_docs]
+        else:
+            files = all_files
+    else:
+        files = all_files
 
     accessible = get_accessible_documents(files, email, role)
-    return {"documents": accessible, "role": role}
+    return {"documents": accessible, "role": role, "workspace": workspace_id}
 
 @app.delete("/documents/{filename}")
 def delete_document(filename: str):
@@ -97,16 +114,19 @@ def delete_document(filename: str):
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...), authorization: str = Header(None)):
     email = "anonymous"
-    role = "viewer"
+    role = "editor"
+    workspace_id = "default"
+
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         email = verify_token(token) or "anonymous"
         user = get_user(email)
         if user:
             role = user.get("role", "viewer")
+            workspace_id = get_user_workspace(email)
 
     if not can_do(role, "upload"):
-        raise HTTPException(status_code=403, detail="You don't have permission to upload documents")
+        raise HTTPException(status_code=403, detail="You don't have permission to upload")
 
     contents = await file.read()
     filepath = save_uploaded_file(contents, file.filename)
@@ -115,6 +135,7 @@ async def upload_document(file: UploadFile = File(...), authorization: str = Hea
     count = embed_and_store(chunks, file.filename)
 
     set_document_owner(file.filename, email)
+    add_workspace_document(workspace_id, file.filename)
 
     tags = {}
     if chunks:
@@ -124,8 +145,10 @@ async def upload_document(file: UploadFile = File(...), authorization: str = Hea
     return {
         "message": f"Successfully processed {file.filename}",
         "chunks_stored": count,
-        "tags": tags
+        "tags": tags,
+        "workspace": workspace_id
     }
+
 @app.get("/tags")
 def list_all_tags():
     return {"tags": get_all_tags()}
@@ -328,3 +351,63 @@ async def tag_all_documents():
             tagged.append(filename)
     
     return {"message": f"Tagged {len(tagged)} documents", "tagged": tagged}
+
+@app.get("/workspaces")
+def list_workspaces(authorization: str = Header(None)):
+    return {"workspaces": get_workspaces()}
+
+@app.post("/workspaces")
+def create_new_workspace(data: dict, authorization: str = Header(None)):
+    email = ""
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return create_workspace(
+        name=data.get("name"),
+        description=data.get("description", ""),
+        created_by=email
+    )
+
+@app.get("/workspaces/my")
+def my_workspace(authorization: str = Header(None)):
+    email = ""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+    workspace_id = get_user_workspace(email)
+    members = get_workspace_members(workspace_id)
+    return {"workspace_id": workspace_id, "members": members}
+
+@app.post("/workspaces/{workspace_id}/members")
+def add_workspace_member(workspace_id: str, data: dict, authorization: str = Header(None)):
+    email = ""
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return add_member(workspace_id, data.get("email"), data.get("role", "member"))
+
+@app.delete("/workspaces/{workspace_id}/members/{member_email}")
+def remove_workspace_member(workspace_id: str, member_email: str, authorization: str = Header(None)):
+    email = ""
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return remove_member(workspace_id, member_email)
