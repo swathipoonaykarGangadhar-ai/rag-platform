@@ -178,9 +178,20 @@ function App() {
   try {
     const endpoint = agentMode ? `${API}/agent` : `${API}/ask`;
     const token = localStorage.getItem('rag_token');
-    const res = await axios.post(endpoint, { question: text }, {
+
+    // Build chat history from last 6 messages
+    const recentHistory = messages.slice(-6).map(m => ({
+      role: m.role,
+      text: m.text
+    }));
+
+    const res = await axios.post(endpoint, {
+      question: text,
+      chat_history: recentHistory
+    }, {
       headers: { Authorization: `Bearer ${token}` }
     });
+
     setMessages(prev => [...prev, {
       role: 'bot',
       text: res.data.answer,

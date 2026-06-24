@@ -1,4 +1,5 @@
 import os
+from backend.generator import generate_answer, generate_answer_with_memory, summarize_document
 from backend.agent import run_agent
 from backend.audit import log_query, get_audit_logs, get_audit_stats
 from fastapi import FastAPI, UploadFile, File, Header, HTTPException
@@ -103,25 +104,28 @@ async def summarize_doc(filename: str):
 async def ask_question(query: dict, authorization: str = Header(None)):
     import time
     question = query.get("question", "")
+    chat_history = query.get("chat_history", [])
     start_time = time.time()
-    
+
     chunks_with_sources = hybrid_search(question)
     if not chunks_with_sources:
         chunks_with_sources = search_with_sources(question)
-    
-    result = generate_answer(question, chunks_with_sources)
-    
+
+    # Use memory-aware generation if history provided
+    if chat_history:
+        result = generate_answer_with_memory(question, chunks_with_sources, chat_history)
+    else:
+        result = generate_answer(question, chunks_with_sources)
+
     response_time = int((time.time() - start_time) * 1000)
-    
-    # Get user email from token
+
     user_email = "anonymous"
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         email = verify_token(token)
         if email:
             user_email = email
-    
-    # Log to audit trail
+
     log_query(
         user_email=user_email,
         question=question,
@@ -130,9 +134,9 @@ async def ask_question(query: dict, authorization: str = Header(None)):
         confidence=result["confidence"],
         response_time_ms=response_time
     )
-    
+
     save_message(question, result["answer"], result["sources"])
-    
+
     return {
         "question": question,
         "answer": result["answer"],

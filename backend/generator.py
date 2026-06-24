@@ -103,3 +103,58 @@ Summary:"""
     )
 
     return response.choices[0].message.content
+def generate_answer_with_memory(query: str, chunks_with_sources: list, chat_history: list) -> dict:
+    context = "\n\n".join([
+        c.get("text", c) if isinstance(c, dict) else c
+        for c in chunks_with_sources
+    ])
+
+    # Build conversation history string
+    history_text = ""
+    if chat_history:
+        history_text = "Previous conversation:\n"
+        for msg in chat_history[-6:]:  # Last 3 exchanges
+            role = "User" if msg.get("role") == "user" else "Assistant"
+            history_text += f"{role}: {msg.get('text', '')}\n"
+        history_text += "\n"
+
+    prompt = f"""You are a helpful document assistant with memory of the conversation.
+Answer the user's question based on the provided context AND the conversation history.
+If referring to something mentioned earlier in the conversation, use that context.
+If the answer is not in the context or history, say "I couldn't find that in the documents."
+
+{history_text}
+Context from documents:
+{context}
+
+Current question: {query}
+
+Answer:"""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=1024
+    )
+
+    answer = response.choices[0].message.content
+    confidence = calculate_confidence(answer, chunks_with_sources)
+
+    sources = []
+    for chunk in chunks_with_sources:
+        if isinstance(chunk, dict):
+            sources.append({
+                "source": chunk.get("source", "Unknown"),
+                "chunk_index": chunk.get("chunk_index", 0),
+                "preview": chunk.get("text", "")[:150] + "...",
+                "hybrid_score": round(chunk.get("hybrid_score", 0), 3),
+                "vector_score": chunk.get("vector_score", 0),
+                "bm25_score": chunk.get("bm25_score", 0)
+            })
+
+    return {
+        "answer": answer,
+        "sources": sources,
+        "confidence": confidence
+    }
