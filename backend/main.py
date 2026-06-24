@@ -1,4 +1,6 @@
 import os
+from backend.auth import register_user, login_user, verify_token, get_user, get_all_users, update_user_role
+from backend.rbac import can_do, set_document_owner, get_accessible_documents, can_access_document
 from backend.tags import save_tags, get_tags, get_all_tags, delete_tags
 from backend.generator import generate_answer, generate_answer_with_memory, summarize_document, compare_documents, tag_document
 from backend.generator import generate_answer, generate_answer_with_memory, summarize_document, compare_documents
@@ -62,7 +64,7 @@ def login(data: dict):
     )
 
 @app.get("/documents")
-def list_documents(user=None):
+def list_documents(authorization: str = Header(None)):
     data_dir = "data"
     if not os.path.exists(data_dir):
         return {"documents": []}
@@ -70,7 +72,19 @@ def list_documents(user=None):
                ".md", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a")
     files = [f for f in os.listdir(data_dir)
              if f.endswith(allowed) and f != "chat_history.json"]
-    return {"documents": files}
+
+    # Filter by role
+    email = "anonymous"
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or "anonymous"
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+
+    accessible = get_accessible_documents(files, email, role)
+    return {"documents": accessible, "role": role}
 
 @app.delete("/documents/{filename}")
 def delete_document(filename: str):
@@ -81,14 +95,28 @@ def delete_document(filename: str):
     return {"message": f"Deleted {filename}"}
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), authorization: str = Header(None)):
+    email = "anonymous"
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or "anonymous"
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+
+    if not can_do(role, "upload"):
+        raise HTTPException(status_code=403, detail="You don't have permission to upload documents")
+
     contents = await file.read()
     filepath = save_uploaded_file(contents, file.filename)
     text = extract_text(filepath)
     chunks = chunk_text(text)
     count = embed_and_store(chunks, file.filename)
 
-    # Auto tag the document
+    set_document_owner(file.filename, email)
+
+    tags = {}
     if chunks:
         tags = tag_document(chunks, file.filename)
         save_tags(file.filename, tags)
@@ -96,7 +124,7 @@ async def upload_document(file: UploadFile = File(...)):
     return {
         "message": f"Successfully processed {file.filename}",
         "chunks_stored": count,
-        "tags": tags if chunks else {}
+        "tags": tags
     }
 @app.get("/tags")
 def list_all_tags():
@@ -254,3 +282,49 @@ async def compare_docs(data: dict):
 
     result = compare_documents(chunks1, chunks2, doc1, doc2)
     return result
+@app.get("/users")
+def list_users(authorization: str = Header(None)):
+    email = ""
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return {"users": get_all_users()}
+
+@app.post("/users/role")
+def change_user_role(data: dict, authorization: str = Header(None)):
+    email = ""
+    role = "viewer"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ")[1]
+        email = verify_token(token) or ""
+        user = get_user(email)
+        if user:
+            role = user.get("role", "viewer")
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return update_user_role(data.get("email"), data.get("role"))
+@app.post("/tags/tag-all")
+async def tag_all_documents():
+    data_dir = "data"
+    allowed = (".pdf", ".docx", ".txt", ".csv",
+               ".md", ".png", ".jpg", ".jpeg", ".mp3", ".wav", ".m4a")
+    files = [f for f in os.listdir(data_dir)
+             if f.endswith(allowed) and f != "chat_history.json"]
+    
+    tagged = []
+    for filename in files:
+        filepath = os.path.join(data_dir, filename)
+        text = extract_text(filepath)
+        chunks = chunk_text(text)
+        if chunks:
+            tags = tag_document(chunks, filename)
+            save_tags(filename, tags)
+            tagged.append(filename)
+    
+    return {"message": f"Tagged {len(tagged)} documents", "tagged": tagged}

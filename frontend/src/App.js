@@ -91,8 +91,14 @@ function App() {
 
   const fetchDocuments = async () => {
     try {
-      const res = await axios.get(`${API}/documents`);
+      const token = localStorage.getItem('rag_token');
+      const res = await axios.get(`${API}/documents`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setDocuments(res.data.documents);
+      if (res.data.role) {
+        setUser(prev => ({ ...prev, role: res.data.role }));
+      }
     } catch {}
   };
 
@@ -153,7 +159,10 @@ function App() {
     formData.append('file', file);
     setUploading(true);
     try {
-      const res = await axios.post(`${API}/upload`, formData);
+      const token = localStorage.getItem('rag_token');
+      const res = await axios.post(`${API}/upload`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       showToast('Done - ' + res.data.chunks_stored + ' chunks indexed');
       if (res.data.tags && res.data.tags.category) {
         showToast('Tagged as: ' + res.data.tags.category + ' - ' + res.data.tags.type);
@@ -170,7 +179,10 @@ function App() {
 
   const deleteDocument = async (filename) => {
     try {
-      await axios.delete(`${API}/documents/${filename}`);
+      const token = localStorage.getItem('rag_token');
+      await axios.delete(`${API}/documents/${filename}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       fetchDocuments();
       fetchTags();
       showToast('Document deleted');
@@ -186,6 +198,17 @@ function App() {
       setSummaries(prev => ({ ...prev, [filename]: res.data.summary }));
     } catch {
       setSummaries(prev => ({ ...prev, [filename]: 'Failed to summarize.' }));
+    }
+  };
+
+  const tagAllDocuments = async () => {
+    showToast('Tagging all documents...');
+    try {
+      const res = await axios.post(`${API}/tags/tag-all`);
+      showToast(res.data.message);
+      fetchTags();
+    } catch {
+      showToast('Tagging failed', 'error');
     }
   };
 
@@ -289,34 +312,58 @@ function App() {
           {/* Upload */}
           <div>
             <div className="section-label">Upload Document</div>
-            <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
-              <div className="upload-icon">📂</div>
-              <div className="upload-label">
-                {file ? file.name : 'Click to choose a file'}
+            {user.role === 'viewer' ? (
+              <div style={{
+                background: '#f8514922', border: '1px solid #f8514944',
+                borderRadius: 8, padding: 12, fontSize: 12,
+                color: '#f85149', textAlign: 'center'
+              }}>
+                👁️ Viewer role — read only access
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="file-input"
-                accept=".pdf,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.mp3,.wav,.m4a"
-                onChange={e => setFile(e.target.files[0])}
-              />
-            </div>
-            {file && (
-              <button
-                className="upload-btn"
-                onClick={uploadFile}
-                disabled={uploading}
-                style={{ marginTop: 8 }}
-              >
-                {uploading ? 'Uploading...' : 'Upload ' + file.name}
-              </button>
+            ) : (
+              <>
+                <div className="upload-zone" onClick={() => fileInputRef.current?.click()}>
+                  <div className="upload-icon">📂</div>
+                  <div className="upload-label">
+                    {file ? file.name : 'Click to choose a file'}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="file-input"
+                    accept=".pdf,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.mp3,.wav,.m4a"
+                    onChange={e => setFile(e.target.files[0])}
+                  />
+                </div>
+                {file && (
+                  <button
+                    className="upload-btn"
+                    onClick={uploadFile}
+                    disabled={uploading}
+                    style={{ marginTop: 8 }}
+                  >
+                    {uploading ? 'Uploading...' : 'Upload ' + file.name}
+                  </button>
+                )}
+              </>
             )}
           </div>
 
           {/* Documents with Tags */}
           <div>
-            <div className="section-label">Documents ({documents.length})</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div className="section-label" style={{ margin: 0 }}>Documents ({documents.length})</div>
+              <button
+                onClick={tagAllDocuments}
+                style={{
+                  background: 'none', border: '1px solid #30363d',
+                  color: '#8b949e', borderRadius: 6, padding: '2px 8px',
+                  cursor: 'pointer', fontSize: 10, fontFamily: 'Inter, sans-serif'
+                }}
+              >
+                🏷️ Tag All
+              </button>
+            </div>
 
             <div className="category-filter">
               {['All', 'Technical', 'HR', 'Finance', 'Legal', 'Personal', 'Other'].map(cat => (
@@ -409,7 +456,7 @@ function App() {
             <span className="msg-badge">{messages.length} messages</span>
           )}
           <span className="topbar-sub">
-            {user.username || user.email} · {documents.length} docs
+            {user.username || user.email} · {user.role || 'editor'} · {documents.length} docs
           </span>
           <button
             onClick={() => setShowAnalytics(true)}

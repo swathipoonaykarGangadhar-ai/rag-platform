@@ -9,11 +9,10 @@ from sqlalchemy.orm import sessionmaker
 
 SECRET_KEY = "rag-platform-secret-key-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Database setup
 engine = create_engine("sqlite:///data/users.db")
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
@@ -23,6 +22,7 @@ class User(Base):
     email = Column(String, primary_key=True, index=True)
     username = Column(String, unique=True)
     hashed_password = Column(String)
+    role = Column(String, default="viewer")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
@@ -53,7 +53,19 @@ def verify_token(token: str) -> Optional[str]:
     except JWTError:
         return None
 
-def register_user(email: str, username: str, password: str) -> dict:
+def get_user(email: str) -> Optional[dict]:
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    db.close()
+    if not user:
+        return None
+    return {
+        "email": user.email,
+        "username": user.username,
+        "role": user.role
+    }
+
+def register_user(email: str, username: str, password: str, role: str = "editor") -> dict:
     db = SessionLocal()
     existing = db.query(User).filter(User.email == email).first()
     if existing:
@@ -63,16 +75,23 @@ def register_user(email: str, username: str, password: str) -> dict:
     if existing_username:
         db.close()
         return {"error": "Username already taken"}
+
+    # First user becomes admin
+    user_count = db.query(User).count()
+    if user_count == 0:
+        role = "admin"
+
     user = User(
         email=email,
         username=username,
-        hashed_password=hash_password(password)
+        hashed_password=hash_password(password),
+        role=role
     )
     db.add(user)
     db.commit()
     db.close()
     token = create_token({"sub": email})
-    return {"token": token, "username": username, "email": email}
+    return {"token": token, "username": username, "email": email, "role": role}
 
 def login_user(email: str, password: str) -> dict:
     db = SessionLocal()
@@ -81,4 +100,21 @@ def login_user(email: str, password: str) -> dict:
     if not user or not verify_password(password, user.hashed_password):
         return {"error": "Invalid email or password"}
     token = create_token({"sub": email})
-    return {"token": token, "username": user.username, "email": email}
+    return {"token": token, "username": user.username, "email": email, "role": user.role}
+
+def get_all_users() -> list:
+    db = SessionLocal()
+    users = db.query(User).all()
+    db.close()
+    return [{"email": u.email, "username": u.username, "role": u.role} for u in users]
+
+def update_user_role(email: str, role: str) -> dict:
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        db.close()
+        return {"error": "User not found"}
+    user.role = role
+    db.commit()
+    db.close()
+    return {"message": f"Role updated to {role} for {email}"}
