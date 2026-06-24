@@ -725,3 +725,36 @@ body {
 
 .step-icon { flex-shrink: 0; }
 .step-desc { flex: 1; }
+.mic-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+
+.mic-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mic-btn.listening {
+  background: #f8514922;
+  border-color: #f85149;
+  color: #f85149;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 #f8514944; }
+  70% { box-shadow: 0 0 0 8px #f8514900; }
+  100% { box-shadow: 0 0 0 0 #f8514900; }
+}

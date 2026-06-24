@@ -1,10 +1,10 @@
-import Analytics from './Analytics';
-import DocumentComparison from './DocumentComparison';
-import AuditDashboard from './AuditDashboard';
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 import Login from './Login';
+import AuditDashboard from './AuditDashboard';
+import DocumentComparison from './DocumentComparison';
+import Analytics from './Analytics';
 
 const API = 'http://127.0.0.1:8000';
 
@@ -34,9 +34,6 @@ function App() {
     const saved = localStorage.getItem('rag_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
-  const [showAudit, setShowAudit] = useState(false);
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [question, setQuestion] = useState('');
@@ -48,10 +45,15 @@ function App() {
   const [toast, setToast] = useState(null);
   const [summaries, setSummaries] = useState({});
   const [expandedDoc, setExpandedDoc] = useState(null);
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
   const [agentMode, setAgentMode] = useState(false);
   const [agentSteps, setAgentSteps] = useState([]);
+  const [showAudit, setShowAudit] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -142,7 +144,7 @@ function App() {
     setUploading(true);
     try {
       const res = await axios.post(`${API}/upload`, formData);
-      showToast(`Done - ${res.data.chunks_stored} chunks indexed`);
+      showToast('Done - ' + res.data.chunks_stored + ' chunks indexed');
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchDocuments();
@@ -173,44 +175,78 @@ function App() {
   };
 
   const askQuestion = async (q) => {
-  const text = q || question;
-  if (!text.trim() || loading) return;
-  setMessages(prev => [...prev, { role: 'user', text }]);
-  setQuestion('');
-  setLoading(true);
-  setAgentSteps([]);
-  try {
-    const endpoint = agentMode ? `${API}/agent` : `${API}/ask`;
-    const token = localStorage.getItem('rag_token');
+    const text = q || question;
+    if (!text.trim() || loading) return;
+    setMessages(prev => [...prev, { role: 'user', text }]);
+    setQuestion('');
+    setLoading(true);
+    setAgentSteps([]);
+    try {
+      const endpoint = agentMode ? `${API}/agent` : `${API}/ask`;
+      const token = localStorage.getItem('rag_token');
+      const recentHistory = messages.slice(-6).map(m => ({
+        role: m.role,
+        text: m.text
+      }));
+      const res = await axios.post(endpoint, {
+        question: text,
+        chat_history: recentHistory
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessages(prev => [...prev, {
+        role: 'bot',
+        text: res.data.answer,
+        sources: res.data.sources,
+        confidence: res.data.confidence,
+        steps: res.data.steps,
+        isAgent: agentMode,
+        timestamp: new Date().toLocaleTimeString()
+      }]);
+      if (res.data.steps) setAgentSteps(res.data.steps);
+    } catch {
+      setMessages(prev => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
+    }
+    setLoading(false);
+  };
 
-    // Build chat history from last 6 messages
-    const recentHistory = messages.slice(-6).map(m => ({
-      role: m.role,
-      text: m.text
-    }));
+  const startVoiceInput = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      showToast('Voice input not supported. Use Chrome!', 'error');
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.onstart = () => {
+      setIsListening(true);
+      showToast('Listening... speak your question');
+    };
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map(result => result[0].transcript)
+        .join('');
+      setQuestion(transcript);
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    recognition.onerror = () => {
+      setIsListening(false);
+      showToast('Voice input error. Try again.', 'error');
+    };
+    recognition.start();
+  };
 
-    const res = await axios.post(endpoint, {
-      question: text,
-      chat_history: recentHistory
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    setMessages(prev => [...prev, {
-      role: 'bot',
-      text: res.data.answer,
-      sources: res.data.sources,
-      confidence: res.data.confidence,
-      steps: res.data.steps,
-      isAgent: agentMode,
-      timestamp: new Date().toLocaleTimeString()
-    }]);
-    if (res.data.steps) setAgentSteps(res.data.steps);
-  } catch {
-    setMessages(prev => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
-  }
-  setLoading(false);
-};
+  const stopVoiceInput = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
 
   const getFileIcon = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
@@ -308,6 +344,7 @@ function App() {
           </button>
         </div>
       </aside>
+
       <main className="main">
         <div className="topbar">
           <button className="toggle-sidebar-btn" onClick={() => setSidebarOpen(o => !o)}>
@@ -321,70 +358,47 @@ function App() {
             {user.username || user.email} · {documents.length} docs
           </span>
           <button
-            onClick={handleLogout}
+            onClick={() => setShowAnalytics(true)}
             style={{
-              background: 'none',
-              border: '1px solid #30363d',
-              color: '#8b949e',
-              borderRadius: 6,
-              padding: '4px 12px',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontFamily: 'Inter, sans-serif',
+              background: 'none', border: '1px solid #30363d',
+              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
               marginLeft: 8
-            }}
-          >
-            <button
-              onClick={() => setShowAnalytics(true)}
-              style={{
-                background: 'none',
-                border: '1px solid #30363d',
-                color: '#8b949e',
-                borderRadius: 6,
-                padding: '4px 12px',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontFamily: 'Inter, sans-serif',
-                marginLeft: 8
-              }}
-            >
-             📈 Analytics
-            </button>
-            <button
-              onClick={() => setShowComparison(true)}
-              style={{
-                background: 'none',
-                border: '1px solid #30363d',
-                color: '#8b949e',
-                borderRadius: 6,
-                padding: '4px 12px',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontFamily: 'Inter, sans-serif',
-                marginLeft: 8
-              }}
-            >
-              📊 Compare
-            </button>
+            }}>
+            📈 Analytics
+          </button>
+          <button
+            onClick={() => setShowComparison(true)}
+            style={{
+              background: 'none', border: '1px solid #30363d',
+              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+              marginLeft: 8
+            }}>
+            📊 Compare
+          </button>
           <button
             onClick={() => setShowAudit(true)}
             style={{
-              background: 'none',
-              border: '1px solid #30363d',
-              color: '#8b949e',
-              borderRadius: 6,
-              padding: '4px 12px',
-              cursor: 'pointer',
-              fontSize: 12,
-              fontFamily: 'Inter, sans-serif',
+              background: 'none', border: '1px solid #30363d',
+              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
               marginLeft: 8
-            }}
-          >
+            }}>
             📋 Audit
           </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'none', border: '1px solid #30363d',
+              color: '#8b949e', borderRadius: 6, padding: '4px 12px',
+              cursor: 'pointer', fontSize: 12, fontFamily: 'Inter, sans-serif',
+              marginLeft: 8
+            }}>
             Sign Out
           </button>
         </div>
+
         <div className="messages">
           {messages.length === 0 ? (
             <div className="empty-state">
@@ -411,10 +425,10 @@ function App() {
                   {msg.isAgent && msg.steps && (
                     <div className="agent-steps">
                       <div className="agent-steps-title">🤖 Agent Research Steps</div>
-                       {msg.steps.map((step, j) => (
+                      {msg.steps.map((step, j) => (
                         <div key={j} className="agent-step">
                           <span className="step-icon">
-                             {step.step === 'Planning' ? '🗺️' : step.step === 'Searching' ? '🔍' : '🧠'}
+                            {step.step === 'Planning' ? '🗺️' : step.step === 'Searching' ? '🔍' : '🧠'}
                           </span>
                           <span className="step-desc">{step.description}</span>
                         </div>
@@ -422,25 +436,25 @@ function App() {
                     </div>
                   )}
                   {msg.confidence && (
-                    <div className={`confidence-badge ${msg.confidence.color}`}>
+                    <div className={'confidence-badge ' + msg.confidence.color}>
                       {msg.confidence.color === 'green' ? '✅' : msg.confidence.color === 'yellow' ? '⚠️' : '🚨'}
                       {' '}{msg.confidence.label} ({msg.confidence.score}%)
                     </div>
                   )}
                   {msg.text}
                   {msg.sources && msg.sources.length > 0 && (
-                   <div className="sources">
-                    <div className="sources-label">Sources</div>
-                    {msg.sources.slice(0, 3).map((src, j) => (
-                     <div key={j} className="source-item">
-                      <div className="source-name">{src.source}</div>
-                      <div className="source-preview">{src.preview}</div>
+                    <div className="sources">
+                      <div className="sources-label">Sources</div>
+                      {msg.sources.slice(0, 3).map((src, j) => (
+                        <div key={j} className="source-item">
+                          <div className="source-name">{src.source}</div>
+                          <div className="source-preview">{src.preview}</div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
             ))
           )}
           {loading && (
@@ -455,39 +469,48 @@ function App() {
           )}
           <div ref={messagesEndRef} />
         </div>
+
         <div className="input-area">
           <div className="agent-toggle">
-          <button
-           className={`agent-btn ${agentMode ? 'active' : ''}`}
-           onClick={() => setAgentMode(m => !m)}
-          >
-           {agentMode ? '🤖 Agent Mode ON' : '💬 Standard Mode'}
-          </button>
-          {agentMode && (
-             <span className="agent-hint">AI will search multiple times for deeper answers</span>
-          )}
+            <button
+              className={'agent-btn ' + (agentMode ? 'active' : '')}
+              onClick={() => setAgentMode(m => !m)}
+            >
+              {agentMode ? '🤖 Agent Mode ON' : '💬 Standard Mode'}
+            </button>
+            {agentMode && (
+              <span className="agent-hint">AI will search multiple times for deeper answers</span>
+            )}
+          </div>
+          <div className="input-wrap">
+            <textarea
+              className="question-input"
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  askQuestion();
+                }
+              }}
+              placeholder={agentMode ? "Ask a complex question... Agent will research deeply" : "Ask anything... (Enter to send)"}
+              rows={1}
+            />
+            <button
+              className={'mic-btn ' + (isListening ? 'listening' : '')}
+              onClick={isListening ? stopVoiceInput : startVoiceInput}
+              title={isListening ? 'Stop listening' : 'Voice input'}
+            >
+              {isListening ? '⏹' : '🎤'}
+            </button>
+            <button className="ask-btn" onClick={() => askQuestion()} disabled={loading}>
+              ➤
+            </button>
+          </div>
+          <div className="input-hint">Enter to send · Shift+Enter for new line · 🎤 for voice</div>
         </div>
-        <div className="input-wrap">
-         <textarea
-           className="question-input"
-           value={question}
-           onChange={e => setQuestion(e.target.value)}
-           onKeyDown={e => {
-             if (e.key === 'Enter' && !e.shiftKey) {
-               e.preventDefault();
-               askQuestion();
-              }
-            }}
-            placeholder={agentMode ? "Ask a complex question... Agent will research deeply" : "Ask anything... (Enter to send)"}
-            rows={1}
-          />
-          <button className="ask-btn" onClick={() => askQuestion()} disabled={loading}>
-            ➤
-          </button>
-        </div>
-      <div className="input-hint">Enter to send · Shift+Enter for new line</div>
-    </div>
       </main>
+
       {toast && (
         <Toast
           message={toast.message}
