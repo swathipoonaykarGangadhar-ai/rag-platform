@@ -4,6 +4,9 @@ from datetime import datetime
 from collections import Counter
 from tinydb import TinyDB, Query
 
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+db = TinyDB(os.path.join(DATA_DIR, 'audit_log.json'))
 db = TinyDB('data/audit_log.json')
 audit_table = db.table('audit_logs')
 

@@ -10,7 +10,8 @@ from pathlib import Path
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\swath\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
-DATA_DIR = "data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 
 def save_uploaded_file(file_bytes: bytes, filename: str) -> str:
     os.makedirs(DATA_DIR, exist_ok=True)

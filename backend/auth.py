@@ -13,7 +13,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-engine = create_engine("sqlite:///data/users.db")
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+engine = create_engine(f"sqlite:///{os.path.join(DATA_DIR, 'users.db')}")
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
 

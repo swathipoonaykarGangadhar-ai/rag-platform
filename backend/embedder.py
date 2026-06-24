@@ -1,9 +1,12 @@
+import os
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 
-client = chromadb.PersistentClient(path="./data/vectordb")
+client = chromadb.PersistentClient(path=os.path.join(DATA_DIR, "vectordb"))
 collection = client.get_or_create_collection(name="documents")
 
 def embed_and_store(chunks: list, filename: str):

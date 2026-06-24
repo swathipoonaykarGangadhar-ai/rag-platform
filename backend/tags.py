@@ -1,6 +1,9 @@
 from tinydb import TinyDB, Query
 
-db = TinyDB('data/document_tags.json')
+import os
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+db = TinyDB(os.path.join(DATA_DIR, 'document_tags.json'))
 tags_table = db.table('tags')
 
 def save_tags(filename: str, tags: dict):
