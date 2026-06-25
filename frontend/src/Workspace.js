@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API = 'http://127.0.0.1:8000';
+const API = 'https://web-production-38b2d.up.railway.app';
 
 function Workspace({ user, onClose }) {
   const [workspaces, setWorkspaces] = useState([]);

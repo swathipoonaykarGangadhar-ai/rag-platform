@@ -7,7 +7,7 @@ import DocumentComparison from './DocumentComparison';
 import Analytics from './Analytics';
 import Workspace from './Workspace';
 
-const API = 'http://127.0.0.1:8000';
+const API = 'https://web-production-38b2d.up.railway.app';
 
 const FILE_ICONS = {
   pdf: '📄', docx: '📝', txt: '📃', csv: '📊',
