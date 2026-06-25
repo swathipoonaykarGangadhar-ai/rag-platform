@@ -16,9 +16,10 @@ function Workspace({ user, onClose }) {
   const headers = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
-    fetchWorkspaces();
-    fetchMyWorkspace();
-  }, []);
+  fetchWorkspaces();
+  fetchMyWorkspace();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, []);
 
   const fetchWorkspaces = async () => {
     try {

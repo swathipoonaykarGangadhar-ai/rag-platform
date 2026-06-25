@@ -47,7 +47,6 @@ function App() {
   const [summaries, setSummaries] = useState({});
   const [expandedDoc, setExpandedDoc] = useState(null);
   const [agentMode, setAgentMode] = useState(false);
-  const [agentSteps, setAgentSteps] = useState([]);
   const [showAudit, setShowAudit] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -224,7 +223,6 @@ function App() {
     setMessages(prev => [...prev, { role: 'user', text }]);
     setQuestion('');
     setLoading(true);
-    setAgentSteps([]);
     try {
       const endpoint = agentMode ? `${API}/agent` : `${API}/ask`;
       const token = localStorage.getItem('rag_token');
@@ -247,7 +245,6 @@ function App() {
         isAgent: agentMode,
         timestamp: new Date().toLocaleTimeString()
       }]);
-      if (res.data.steps) setAgentSteps(res.data.steps);
     } catch {
       setMessages(prev => [...prev, { role: 'bot', text: 'Something went wrong. Please try again.' }]);
     }
